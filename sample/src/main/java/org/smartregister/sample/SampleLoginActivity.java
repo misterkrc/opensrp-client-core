@@ -41,4 +41,14 @@ public class SampleLoginActivity extends BaseLoginActivity implements BaseLoginC
         startActivity(navigateToRegister);
     }
 
+    @Override
+    public String getAuthTokenType() {
+        return null;
+    }
+
+    @Override
+    public boolean isNewAccount() {
+        return false;
+    }
+
 }

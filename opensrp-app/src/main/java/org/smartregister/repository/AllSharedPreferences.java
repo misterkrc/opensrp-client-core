@@ -15,6 +15,9 @@ import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.smartregister.AllConstants.FORCE_REMOTE_LOGIN;
+
+
 public class AllSharedPreferences {
     public static final String ANM_IDENTIFIER_PREFERENCE_KEY = "anmIdentifier";
     public static final String ANM_IDENTIFIER_SET_PREFERENCE_KEY = "anmIdentifierSet";
@@ -56,12 +59,12 @@ public class AllSharedPreferences {
         return preferences.getStringSet(ANM_IDENTIFIER_SET_PREFERENCE_KEY, new HashSet<>()).contains(userName);
     }
 
-    public boolean fetchForceRemoteLogin(String username) {
-        return preferences.getBoolean(new StringBuffer(AllConstants.FORCE_REMOTE_LOGIN).append('_').append(username).toString(), true);
+    public boolean fetchForceRemoteLogin() {
+        return preferences.getBoolean(FORCE_REMOTE_LOGIN, true);
     }
 
-    public void saveForceRemoteLogin(boolean forceRemoteLogin, String username) {
-        preferences.edit().putBoolean(new StringBuffer(AllConstants.FORCE_REMOTE_LOGIN).append('_').append(username).toString(), forceRemoteLogin).commit();
+    public void saveForceRemoteLogin(boolean forceRemoteLogin) {
+        preferences.edit().putBoolean(FORCE_REMOTE_LOGIN, forceRemoteLogin).commit();
     }
 
     public String fetchServerTimeZone() {
@@ -77,6 +80,19 @@ public class AllSharedPreferences {
             return preferences.getString(AllConstants.ENCRYPTED_GROUP_ID_PREFIX + username, null);
         }
         return null;
+    }
+
+    public String fetchEncryptedPassword(String username) {
+        if (username != null) {
+            return preferences.getString(AllConstants.ENCRYPTED_PASSWORD_PREFIX + username, null);
+        }
+        return null;
+    }
+
+    public void saveEncryptedPassword(String username, String password) {
+        if (username != null) {
+            preferences.edit().putString(AllConstants.ENCRYPTED_PASSWORD_PREFIX + username, password).commit();
+        }
     }
 
     public String fetchPioneerUser() {
@@ -150,6 +166,13 @@ public class AllSharedPreferences {
     public void saveCurrentLocality(String currentLocality) {
         preferences.edit().putString(AllConstants.CURRENT_LOCALITY, currentLocality).commit();
     }
+
+    public void saveEncryptedGroupId(String username, String groupId) {
+        if (username != null) {
+            preferences.edit().putString(AllConstants.ENCRYPTED_GROUP_ID_PREFIX + username, groupId).commit();
+        }
+    }
+
 
     public String fetchCurrentDataStrategy() {
         return preferences.getString(AllConstants.DATA_STRATEGY, AllConstants.DATA_CAPTURE_STRATEGY.NORMAL);

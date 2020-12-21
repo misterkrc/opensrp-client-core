@@ -14,10 +14,10 @@ public class LocalLoginTask extends AsyncTask<Void, Integer, Boolean> {
 
     private BaseLoginContract.View mLoginView;
     private final String mUsername;
-    private final char[] mPassword;
+    private final String mPassword;
     private final Listener<Boolean> mAfterLoginCheck;
 
-    public LocalLoginTask(BaseLoginContract.View loginView, String username, char[] password, Listener<Boolean> afterLoginCheck) {
+    public LocalLoginTask(BaseLoginContract.View loginView, String username, String password, Listener<Boolean> afterLoginCheck) {
         mLoginView = loginView;
         mUsername = username;
         mPassword = password;

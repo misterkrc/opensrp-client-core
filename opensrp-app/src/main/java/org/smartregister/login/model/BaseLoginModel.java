@@ -17,8 +17,8 @@ public class BaseLoginModel implements BaseLoginContract.Model {
     }
 
     @Override
-    public boolean isPasswordValid(char[] password) {
-        return password != null && password.length > 1;
+    public boolean isPasswordValid(String password) {
+        return !TextUtils.isEmpty(password) && password.length() > 1;
     }
 
     @Override

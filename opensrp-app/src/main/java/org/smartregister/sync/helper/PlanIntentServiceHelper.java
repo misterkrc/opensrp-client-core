@@ -50,8 +50,6 @@ public class PlanIntentServiceHelper extends BaseHelper {
 
     public static final String SYNC_PLANS_URL = "/rest/plans/sync";
     public static final String PLAN_LAST_SYNC_DATE = "plan_last_sync_date";
-    private long totalRecords;
-    private SyncProgress syncProgress;
 
     public static PlanIntentServiceHelper getInstance() {
         if (instance == null) {
@@ -67,18 +65,6 @@ public class PlanIntentServiceHelper extends BaseHelper {
     }
 
     public void syncPlans() {
-        syncProgress = new SyncProgress();
-        syncProgress.setSyncEntity(SyncEntity.PLANS);
-        syncProgress.setTotalRecords(totalRecords);
-
-        int batchFetchCount = batchFetchPlansFromServer(true);
-
-        syncProgress.setPercentageSynced(Utils.calculatePercentage(totalRecords, batchFetchCount));
-        sendSyncProgressBroadcast(syncProgress, context);
-    }
-
-    private int batchFetchPlansFromServer(boolean returnCount) {
-        int batchFetchCount = 0;
         try {
             long serverVersion = 0;
             try {
@@ -93,7 +79,7 @@ public class PlanIntentServiceHelper extends BaseHelper {
             Long maxServerVersion = 0l;
 
             String organizationIds = allSharedPreferences.getPreference(AllConstants.ORGANIZATION_IDS);
-            String plansResponse = fetchPlans(Arrays.asList(organizationIds.split(",")), serverVersion, returnCount);
+            String plansResponse = fetchPlans(Arrays.asList(organizationIds.split(",")), serverVersion);
             List<PlanDefinition> plans = gson.fromJson(plansResponse, new TypeToken<List<PlanDefinition>>() {
             }.getType());
             for (PlanDefinition plan : plans) {
@@ -105,24 +91,15 @@ public class PlanIntentServiceHelper extends BaseHelper {
             }
             // update most recent server version
             if (!Utils.isEmptyCollection(plans)) {
-                batchFetchCount = plans.size();
                 allSharedPreferences.savePreference(PLAN_LAST_SYNC_DATE, String.valueOf(getPlanDefinitionMaxServerVersion(plans, maxServerVersion)));
-
-                syncProgress.setPercentageSynced(Utils.calculatePercentage(totalRecords, batchFetchCount));
-                sendSyncProgressBroadcast(syncProgress, context);
-
-                // retry fetch since there were items synced from the server
-                batchFetchPlansFromServer(false);
             }
         } catch (Exception e) {
             Timber.e(e, "EXCEPTION %s", e.toString());
         }
-
-        return batchFetchCount;
     }
 
-    private String fetchPlans(List<String> organizationIds, long serverVersion, boolean returnCount) throws Exception {
-        HTTPAgent httpAgent = getHttpAgent();
+    private String fetchPlans(List<String> organizationIds, long serverVersion) throws Exception {
+        HTTPAgent httpAgent = CoreLibrary.getInstance().context().getHttpAgent();
         String baseUrl = CoreLibrary.getInstance().context().configuration().dristhiBaseURL();
         String endString = "/";
         if (baseUrl.endsWith(endString)) {
@@ -134,7 +111,6 @@ public class PlanIntentServiceHelper extends BaseHelper {
             request.put("organizations", new JSONArray(organizationIds));
         }
         request.put("serverVersion", serverVersion);
-        request.put(AllConstants.RETURN_COUNT, returnCount);
 
         if (httpAgent == null) {
             context.sendBroadcast(Utils.completeSync(FetchStatus.noConnection));
@@ -150,9 +126,6 @@ public class PlanIntentServiceHelper extends BaseHelper {
         if (resp.isFailure()) {
             context.sendBroadcast(Utils.completeSync(FetchStatus.nothingFetched));
             throw new NoHttpResponseException(SYNC_PLANS_URL + " did not return any data");
-        }
-        if (returnCount) {
-            totalRecords = resp.getTotalRecords();
         }
         return resp.payload().toString();
     }

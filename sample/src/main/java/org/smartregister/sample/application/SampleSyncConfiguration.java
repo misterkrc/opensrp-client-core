@@ -64,18 +64,4 @@ public class SampleSyncConfiguration extends SyncConfiguration {
         return null;
     }
 
-    @Override
-    public String getOauthClientId() {
-        return BuildConfig.OAUTH_CLIENT_ID;
-    }
-
-    @Override
-    public String getOauthClientSecret() {
-        return BuildConfig.OAUTH_CLIENT_SECRET;
-    }
-
-    @Override
-    public Class<? extends BaseLoginActivity> getAuthenticationActivity() {
-        return null;
-    }
 }

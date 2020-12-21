@@ -2,6 +2,7 @@ package org.smartregister.service;
 
 import android.content.Context;
 import android.util.Base64;
+import android.util.Log;
 import android.webkit.MimeTypeMap;
 
 import androidx.annotation.NonNull;
@@ -18,12 +19,6 @@ import org.apache.http.util.ByteArrayBuffer;
 import org.smartregister.AllConstants;
 import org.smartregister.CoreLibrary;
 import org.smartregister.DristhiConfiguration;
-import org.smartregister.account.AccountAuthenticatorXml;
-import org.smartregister.account.AccountConfiguration;
-import org.smartregister.account.AccountError;
-import org.smartregister.account.AccountHelper;
-import org.smartregister.account.AccountResponse;
-import org.smartregister.account.AccountUserInfo;
 import org.smartregister.compression.GZIPCompression;
 import org.smartregister.domain.DownloadStatus;
 import org.smartregister.domain.LoginResponse;
@@ -32,6 +27,7 @@ import org.smartregister.domain.Response;
 import org.smartregister.domain.ResponseErrorStatus;
 import org.smartregister.domain.ResponseStatus;
 import org.smartregister.domain.jsonmapping.LoginResponseData;
+import org.smartregister.repository.AllSettings;
 import org.smartregister.repository.AllSharedPreferences;
 import org.smartregister.security.SecurityHelper;
 import org.smartregister.ssl.OpensrpSSLHelper;
@@ -92,6 +88,7 @@ public class HTTPAgent {
     public static final int FILE_UPLOAD_CHUNK_SIZE_BYTES = 4096;
 
     private Context context;
+    private AllSettings settings;
     private AllSharedPreferences allSharedPreferences;
     private DristhiConfiguration configuration;
     private GZIPCompression gzipCompression;
@@ -118,25 +115,24 @@ public class HTTPAgent {
 
     /**
      * This method initializes httpurlconnection
-     *
-     * @param requestURLPath This is the url to open http connection to.
-     * @param setOauthToken  A boolean to flag whether to set the OAuth2 bearer access token in the Authorization header of request.
-     * @return HttpURLConnection Http connection to the OpenSRP server.
+     * @param requestURLPath This is the url to be open http connection to.
+     * @param useBasicAuth This is whether to set up basic authentication or not.
+     * @return HttpURLConnection This returns the http connection to opensrp server.
      */
-    private HttpURLConnection initializeHttp(String requestURLPath, boolean setOauthToken) throws IOException {
-
-        HttpURLConnection urlConnection = getHttpURLConnection(requestURLPath);
-
+    private HttpURLConnection initializeHttp(String requestURLPath, boolean useBasicAuth) throws IOException {
+        URL url = new URL(requestURLPath);
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         if (urlConnection instanceof HttpsURLConnection) {
             OpensrpSSLHelper opensrpSSLHelper = new OpensrpSSLHelper(context, configuration);
             ((HttpsURLConnection) urlConnection).setSSLSocketFactory(opensrpSSLHelper.getSSLSocketFactory());
         }
         urlConnection.setConnectTimeout(getConnectTimeout());
         urlConnection.setReadTimeout(getReadTimeout());
-        if (setOauthToken) {
-            AccountAuthenticatorXml authenticatorXml = CoreLibrary.getInstance().getAccountAuthenticatorXml();
-            if (AccountHelper.getOauthAccountByNameAndType(allSharedPreferences.fetchRegisteredANM(), authenticatorXml.getAccountType()) != null)
-                urlConnection.setRequestProperty(AllConstants.HTTP_REQUEST_HEADERS.AUTHORIZATION, new StringBuilder(AllConstants.HTTP_REQUEST_AUTH_TOKEN_TYPE.BEARER + " ").append(AccountHelper.getOAuthToken(allSharedPreferences.fetchRegisteredANM(), authenticatorXml.getAccountType(), AccountHelper.TOKEN_TYPE.PROVIDER)).toString());
+
+        if(useBasicAuth) {
+            final String basicAuth = "Basic " + Base64.encodeToString((allSharedPreferences.fetchRegisteredANM() +
+                    ":" + settings.fetchANMPassword()).getBytes(), Base64.NO_WRAP);
+            urlConnection.setRequestProperty("Authorization", basicAuth);
         }
         return urlConnection;
     }
@@ -148,19 +144,9 @@ public class HTTPAgent {
     }
 
     public Response<String> fetch(String requestURLPath) {
+        HttpURLConnection urlConnection;
         try {
-
-            HttpURLConnection urlConnection = initializeHttp(requestURLPath, true);
-
-            //If unauthorized invalidate cache of old token retry
-            if (HttpStatus.SC_UNAUTHORIZED == urlConnection.getResponseCode()) {
-
-                invalidateExpiredCachedAccessToken();
-
-                urlConnection = initializeHttp(requestURLPath, true);
-
-            }
-
+            urlConnection = initializeHttp(requestURLPath, true);
             return processResponse(urlConnection);
 
         } catch (IOException ex) {
@@ -169,60 +155,31 @@ public class HTTPAgent {
         }
     }
 
-    public void invalidateExpiredCachedAccessToken() {
-        AccountAuthenticatorXml authenticatorXml = CoreLibrary.getInstance().getAccountAuthenticatorXml();
-        String authToken = AccountHelper.getCachedOAuthToken(allSharedPreferences.fetchRegisteredANM(), authenticatorXml.getAccountType(), AccountHelper.TOKEN_TYPE.PROVIDER);
-        if (authToken != null)
-            AccountHelper.invalidateAuthToken(authenticatorXml.getAccountType(), authToken);
-    }
-
     public Response<String> post(String postURLPath, String jsonPayload) {
         HttpURLConnection urlConnection;
         try {
+            urlConnection = initializeHttp(postURLPath, true);
 
-            urlConnection = generatePostRequest(postURLPath, jsonPayload);
+            urlConnection.setDoOutput(true);
+            urlConnection.setRequestMethod("POST");
+            urlConnection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            urlConnection.setRequestProperty("Content-Encoding", "gzip");
 
-            //If unauthorized invalidate cache of old token retry
-            if (HttpStatus.SC_UNAUTHORIZED == urlConnection.getResponseCode()) {
+            OutputStream os = urlConnection.getOutputStream();
+            BufferedOutputStream writer = new BufferedOutputStream(os);
+            writer.write(gzipCompression.compress(jsonPayload));
+            writer.flush();
+            writer.close();
+            os.close();
 
-                invalidateExpiredCachedAccessToken();
-
-                urlConnection = generatePostRequest(postURLPath, jsonPayload);
-
-            }
+            urlConnection.connect();
 
             return processResponse(urlConnection);
 
         } catch (IOException ex) {
-            Timber.e(ex, "EXCEPTION: %s", ex.toString());
+            Timber.e(ex,  "EXCEPTION: %s", ex.toString());
             return new Response<>(ResponseStatus.failure, null);
         }
-    }
-
-    @NonNull
-    @VisibleForTesting
-    protected HttpURLConnection generatePostRequest(String postURLPath, String jsonPayload) throws IOException {
-        HttpURLConnection urlConnection;
-        urlConnection = initializeHttp(postURLPath, true);
-
-        urlConnection.setDoOutput(true);
-        urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        urlConnection.setRequestProperty("Content-Encoding", "gzip");
-
-        byte[] content = gzipCompression.compress(jsonPayload);
-        urlConnection.setFixedLengthStreamingMode(content.length);
-
-        OutputStream os = urlConnection.getOutputStream();
-        BufferedOutputStream writer = new BufferedOutputStream(os);
-
-        writer.write(content);
-        writer.flush();
-        writer.close();
-        os.close();
-
-        urlConnection.connect();
-        return urlConnection;
     }
 
     public Response<String> postWithJsonResponse(String postURLPath, String jsonPayload) {
@@ -234,7 +191,7 @@ public class HTTPAgent {
         Timber.d("postURLPath: %s and jsonPayLoad: %s", postURLPath, jsonPayload);
     }
 
-    public LoginResponse urlCanBeAccessWithGivenCredentials(String requestURL, String userName, char[] password) {
+    public LoginResponse urlCanBeAccessWithGivenCredentials(String requestURL, String userName, String password) {
         LoginResponse loginResponse = null;
         HttpURLConnection urlConnection = null;
         String url = null;
@@ -242,18 +199,15 @@ public class HTTPAgent {
             url = requestURL.replaceAll("\\s+", "");
             urlConnection = initializeHttp(url, false);
 
-            byte[] credentials = SecurityHelper.toBytes(new StringBuffer(userName).append(':').append(password));
-            final String basicAuth = AllConstants.HTTP_REQUEST_AUTH_TOKEN_TYPE.BASIC + " " + Base64.encodeToString(credentials, Base64.NO_WRAP);
-            urlConnection.setRequestProperty(AllConstants.HTTP_REQUEST_HEADERS.AUTHORIZATION, basicAuth);
+            final String basicAuth = "Basic " + Base64.encodeToString((userName + ":" + password).getBytes(), Base64.NO_WRAP);
+            urlConnection.setRequestProperty("Authorization", basicAuth);
             int statusCode = urlConnection.getResponseCode();
             InputStream inputStream;
-            String responseString = "";
             if (statusCode >= HttpStatus.SC_BAD_REQUEST)
                 inputStream = urlConnection.getErrorStream();
             else
                 inputStream = urlConnection.getInputStream();
-            if (inputStream != null)
-                responseString = IOUtils.toString(inputStream);
+            String responseString = IOUtils.toString(inputStream);
             if (statusCode == HttpStatus.SC_OK) {
 
                 Timber.d("response String: %s using request url %s", responseString, url);
@@ -291,28 +245,18 @@ public class HTTPAgent {
     }
 
     public DownloadStatus downloadFromUrl(String url, String filename) {
-
-        Response<DownloadStatus> status = downloadFromURL(url, filename);
+        Response<DownloadStatus> status = downloadFromURL(url, filename,
+                allSharedPreferences.fetchRegisteredANM(), settings.fetchANMPassword());
         Timber.d("downloading file name : %s and url %s", filename, url);
         return status.payload();
     }
 
-    public Response<String> fetchWithCredentials(String requestURL, String accessToken) {
-
+    public Response<String> fetchWithCredentials(String requestURL, String username, String password) {
+        HttpURLConnection urlConnection = null;
         try {
+            urlConnection = initializeHttp(requestURL, false);
 
-            HttpURLConnection urlConnection = initializeHttp(requestURL, false);
-            urlConnection.setRequestProperty(AllConstants.HTTP_REQUEST_HEADERS.AUTHORIZATION, new StringBuilder(AllConstants.HTTP_REQUEST_AUTH_TOKEN_TYPE.BEARER + " ").append(accessToken).toString());
-
-            //If unauthorized invalidate cache of old token retry
-            if (HttpStatus.SC_UNAUTHORIZED == urlConnection.getResponseCode()) {
-
-                AccountAuthenticatorXml authenticatorXml = CoreLibrary.getInstance().getAccountAuthenticatorXml();
-                AccountHelper.invalidateAuthToken(authenticatorXml.getAccountType(), accessToken);
-
-                urlConnection = initializeHttp(requestURL, true);
-
-            }
+            setCustomCredentials(urlConnection, username, password);
             return processResponse(urlConnection);
 
         } catch (IOException ex) {
@@ -321,6 +265,13 @@ public class HTTPAgent {
         }
 
     }
+
+    private void setCustomCredentials(HttpURLConnection urlConnection, String username, String password) {
+        final String basicAuth = "Basic " + Base64.encodeToString((username + ":" + password).getBytes(),
+                Base64.NO_WRAP);
+        urlConnection.setRequestProperty("Authorization", basicAuth);
+    }
+
 
     private Response<String> processResponse(HttpURLConnection urlConnection) {
         String responseString;
@@ -355,7 +306,7 @@ public class HTTPAgent {
         } finally {
             closeConnection(urlConnection);
         }
-        return new Response<>(ResponseStatus.success, responseString).withTotalRecords(Utils.tryParseLong(totalRecords, 0));
+        return new Response<>(ResponseStatus.success, responseString);
     }
 
 
@@ -551,7 +502,7 @@ public class HTTPAgent {
 
     /**
      * Sets the connection timeout in milliseconds
-     * <p>
+     *
      * Setting this will call {@link java.net.HttpURLConnection#setConnectTimeout(int)}
      * on the {@link java.net.HttpURLConnection} instance in {@link org.smartregister.service.HTTPAgent}
      */
@@ -561,7 +512,7 @@ public class HTTPAgent {
 
     /**
      * Sets the read timeout in milliseconds
-     * <p>
+     *
      * Setting this will call {@link java.net.HttpURLConnection#setReadTimeout(int)}
      * on the {@link java.net.HttpURLConnection} instance in {@link org.smartregister.service.HTTPAgent}
      */
@@ -569,192 +520,12 @@ public class HTTPAgent {
         this.readTimeout = readTimeout;
     }
 
-    public AccountResponse oauth2authenticateCore(StringBuffer requestParamBuffer, String grantType, String tokenEndpointURL) {
-
-
-        AccountError accountError;
-        HttpURLConnection urlConnection = null;
-        OutputStream outputStream = null;
-        BufferedOutputStream writer = null;
-        InputStream inputStream;
-
-        try {
-            urlConnection = initializeHttp(tokenEndpointURL, false);
-
-            String clientId = CoreLibrary.getInstance().getSyncConfiguration().getOauthClientId();
-            String clientSecret = CoreLibrary.getInstance().getSyncConfiguration().getOauthClientSecret();
-
-            final String base64Auth = BaseEncoding.base64().encode(new StringBuffer(clientId).append(':').append(clientSecret).toString().getBytes(CharEncoding.UTF_8));
-
-            requestParamBuffer.append("&grant_type=").append(grantType);
-
-            if (allSharedPreferences.getPreferences().getBoolean(AccountHelper.CONFIGURATION_CONSTANTS.IS_KEYCLOAK_CONFIGURED, false)) {
-
-                requestParamBuffer.append("&client_id=").append(clientId);
-                requestParamBuffer.append("&client_secret=").append(clientSecret);
-
-            } else {
-
-                urlConnection.setRequestProperty(AllConstants.HTTP_REQUEST_HEADERS.AUTHORIZATION, AllConstants.HTTP_REQUEST_AUTH_TOKEN_TYPE.BASIC + " " + base64Auth);
-
-            }
-
-            byte[] postData = requestParamBuffer.toString().getBytes(CharEncoding.UTF_8);
-            int postDataLength = postData.length;
-
-            urlConnection.setFixedLengthStreamingMode(postDataLength);
-            urlConnection.setDoOutput(true);
-            urlConnection.setInstanceFollowRedirects(false);
-            urlConnection.setRequestMethod("POST");
-            urlConnection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-            urlConnection.setRequestProperty("charset", "utf-8");
-            urlConnection.setRequestProperty("Content-Length", Integer.toString(postDataLength));
-            urlConnection.setUseCaches(false);
-
-            outputStream = urlConnection.getOutputStream();
-            writer = new BufferedOutputStream(outputStream);
-            writer.write(postData);
-            writer.flush();
-
-            int statusCode = urlConnection.getResponseCode();
-            if (statusCode >= HttpStatus.SC_BAD_REQUEST)
-                inputStream = urlConnection.getErrorStream();
-            else
-                inputStream = urlConnection.getInputStream();
-            String responseString = IOUtils.toString(inputStream);
-            if (statusCode == HttpStatus.SC_OK) {
-
-                Timber.d("response String: %s using request url %s", responseString, tokenEndpointURL);
-
-                AccountResponse accountResponse = gson.fromJson(responseString, AccountResponse.class);
-                accountResponse.setStatus(statusCode);
-                return accountResponse;
-
-            } else {
-
-                accountError = gson.fromJson(responseString, AccountError.class);
-                return new AccountResponse(statusCode, accountError);
-
-            }
-        } catch (MalformedURLException e) {
-            Timber.e(e, "Failed to check credentials bad url %s", tokenEndpointURL);
-            accountError = new AccountError(0, MALFORMED_URL.name());
-
-        } catch (SocketTimeoutException e) {
-            Timber.e(e, "SocketTimeoutException when authenticating");
-
-            accountError = new AccountError(0, TIMEOUT.name());
-
-            Timber.e(e, "Failed to check credentials using %s . Error: %s", tokenEndpointURL, e.toString());
-        } catch (IOException e) {
-            Timber.e(e, "Failed to check credentials using %s . Error: %s", tokenEndpointURL, e.toString());
-            accountError = new AccountError(0, NO_INTERNET_CONNECTIVITY.name());
-
-        } finally {
-
-            closeConnection(urlConnection);
-            closeIOStream(writer);
-            closeIOStream(outputStream);
-
-        }
-
-        //If we got here there was an issue with no server status code
-        return new AccountResponse(0, accountError);
-
-    }
-
-    public AccountResponse oauth2authenticate(String username, char[] password, String grantType, String tokenEndpointURL) {
-
-        StringBuffer requestParamBuilder = new StringBuffer();
-        requestParamBuilder.append("&username=").append(username);
-        requestParamBuilder.append("&password=").append(password);
-
-        return oauth2authenticateCore(requestParamBuilder, grantType, tokenEndpointURL);
-    }
-
-    public AccountResponse oauth2authenticateRefreshToken(String refreshToken) {
-
-        String tokenEndpointURL = allSharedPreferences.getPreferences().getString(AccountHelper.CONFIGURATION_CONSTANTS.TOKEN_ENDPOINT_URL, "");
-        StringBuffer requestParamBuilder = new StringBuffer();
-        requestParamBuilder.append("&refresh_token=").append(refreshToken);
-
-        return oauth2authenticateCore(requestParamBuilder, AccountHelper.OAUTH.GRANT_TYPE.REFRESH_TOKEN, tokenEndpointURL);
-    }
-
-    public LoginResponse fetchUserDetails(String requestURL, String oauthAccessToken) {
-        LoginResponse loginResponse = null;
-        String url = null;
-        HttpURLConnection urlConnection = null;
-        try {
-            url = requestURL.replaceAll("\\s+", "");
-
-            urlConnection = initializeHttp(url, false);
-            urlConnection.setRequestProperty(AllConstants.HTTP_REQUEST_HEADERS.AUTHORIZATION, new StringBuilder(AllConstants.HTTP_REQUEST_AUTH_TOKEN_TYPE.BEARER + " ").append(oauthAccessToken).toString());
-
-            int statusCode = urlConnection.getResponseCode();
-
-            InputStream inputStream;
-            String responseString = null;
-            if (statusCode >= HttpStatus.SC_BAD_REQUEST)
-                inputStream = urlConnection.getErrorStream();
-            else
-                inputStream = urlConnection.getInputStream();
-
-            if (inputStream != null)
-                responseString = IOUtils.toString(inputStream);
-
-            if (statusCode == HttpStatus.SC_OK) {
-
-                Timber.d("response String: %s using request url %s", responseString, url);
-                LoginResponseData responseData = getResponseBody(responseString);
-                loginResponse = retrieveResponse(responseData);
-            } else if (statusCode == HttpStatus.SC_UNAUTHORIZED) {
-                Timber.e("Invalid credentials accessing: %s using token %s", url, oauthAccessToken);
-                loginResponse = UNAUTHORIZED;
-            } else if (StringUtils.isNotBlank(responseString)) {
-                //extract message string from the default tomcat server response which is usually between <p><b>message</b> and </u></p>
-                responseString = StringUtils.substringBetween(responseString, "<p><b>message</b>", "</u></p>");
-                if (StringUtils.isNotBlank(responseString)) {
-                    //remove the underline tag from the responseString
-                    responseString = responseString.replace("<u>", "").trim();
-                    loginResponse = CUSTOM_SERVER_RESPONSE.withMessage(responseString);
-                }
-            } else {
-                Timber.e("Bad response from Server. Status code: %s using %s ", statusCode, url);
-                loginResponse = UNKNOWN_RESPONSE;
-            }
-        } catch (MalformedURLException e) {
-            Timber.e(e, "Failed to check credentials bad url %s", url);
-            loginResponse = MALFORMED_URL;
-        } catch (SocketTimeoutException e) {
-            Timber.e(e, "SocketTimeoutException when authenticating");
-            loginResponse = TIMEOUT;
-        } catch (IOException e) {
-            Timber.e(e, "Failed to connect to %s check, check internet connection. Error: %s", url, e.toString());
-            loginResponse = NO_INTERNET_CONNECTIVITY;
-        } finally {
-
-            closeConnection(urlConnection);
-        }
-        return loginResponse;
-    }
-
     /**
      * @param downloadURL_ This is the url of the image
      * @param fileName     This is how the image should be name after it has been downloaded.
      * @return Response<DownloadStatus> This returns whether the download succeeded or failed.
      */
-    public Response<DownloadStatus> downloadFromURL(String downloadURL_, String fileName) {
-        return downloadFromURL(downloadURL_, fileName, new HashMap<>());
-    }
-
-    /**
-     * @param downloadURL_ This is the url of the image
-     * @param fileName     This is how the image should be name after it has been downloaded.
-     * @param detailsMap   store values that might be needed after save of file
-     * @return Response<DownloadStatus> This returns whether the download succeeded or failed.
-     */
-    public Response<DownloadStatus> downloadFromURL(String downloadURL_, String fileName, Map<String, String> detailsMap) {
+    public Response<DownloadStatus> downloadFromURL(String downloadURL_, String fileName, String username, String password) {
 
         HttpURLConnection httpUrlConnection = null;
         try {
@@ -789,9 +560,6 @@ public class HTTPAgent {
                 }
 
                 File file = getFile(tempFileName, dir);
-
-                detailsMap.put(AllConstants.DownloadFileConstants.FILE_NAME, tempFileName);
-                detailsMap.put(AllConstants.DownloadFileConstants.FILE_PATH, file.getPath());
 
                 InputStream inputStream = httpUrlConnection.getInputStream();
                 BufferedInputStream bufferedInputStream = getBufferedInputStream(inputStream);
@@ -865,157 +633,7 @@ public class HTTPAgent {
         return new File(sdcardPathDownload);
     }
 
-    public boolean verifyAuthorization() {
 
-        String userInfoUrl = allSharedPreferences.getPreferences().getString(AccountHelper.CONFIGURATION_CONSTANTS.USERINFO_ENDPOINT_URL, "");
-
-        if (StringUtils.isBlank(userInfoUrl)) {
-
-            return verifyAuthorizationLegacy();
-        }
-
-        HttpURLConnection urlConnection = null;
-
-        InputStream inputStream = null;
-
-        try {
-
-            urlConnection = initializeHttp(userInfoUrl, true);
-
-            AccountUserInfo userInfo = null;
-
-            if (HttpStatus.SC_UNAUTHORIZED == urlConnection.getResponseCode()) {
-
-                invalidateExpiredCachedAccessToken();
-
-                urlConnection = initializeHttp(userInfoUrl, true);
-
-            }
-
-            if (urlConnection.getResponseCode() == HttpStatus.SC_OK) {
-
-                inputStream = urlConnection.getInputStream();
-
-                String responseString = IOUtils.toString(inputStream);
-
-                userInfo = gson.fromJson(responseString, AccountUserInfo.class);
-
-            } else {
-                Timber.w("Error occurred verifying authorization, User will not be logged off");
-            }
-
-            if (userInfo == null || userInfo.getEnabled() == null)
-                return verifyAuthorizationLegacy();
-
-            if (userInfo.getEnabled()) {
-
-                Timber.i("User is Authorized");
-                return true;
-
-            } else {
-
-                Timber.i("User not authorized. User access was revoked, will log off user");
-                return false;
-            }
-
-        } catch (IOException e) {
-
-            Timber.e(e);
-
-        } finally {
-
-            closeConnection(urlConnection);
-            closeIOStream(inputStream);
-        }
-        return true;
-    }
-
-    //For backward compatibility
-    public boolean verifyAuthorizationLegacy() {
-
-        String baseUrl = configuration.dristhiBaseURL();
-
-        if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-        }
-        final String username = allSharedPreferences.fetchRegisteredANM();
-        baseUrl = baseUrl + DETAILS_URL + username;
-
-        HttpURLConnection urlConnection = null;
-
-        try {
-
-            urlConnection = initializeHttp(baseUrl, true);
-
-            int statusCode = urlConnection.getResponseCode();
-
-            if (HttpStatus.SC_UNAUTHORIZED == urlConnection.getResponseCode()) {
-
-                invalidateExpiredCachedAccessToken();
-
-                urlConnection = initializeHttp(baseUrl, true);
-
-                if (HttpStatus.SC_OK == urlConnection.getResponseCode()) {
-                    return true;
-
-                } else if (HttpStatus.SC_UNAUTHORIZED == urlConnection.getResponseCode()) {
-
-                    Timber.i("User not authorized. User access was revoked, will log off user");
-                    return false;
-                }
-
-            } else if (statusCode != HttpStatus.SC_OK) {
-                Timber.w("Error occurred verifying authorization, User will not be logged off");
-            } else {
-                Timber.i("User is Authorized");
-            }
-
-        } catch (IOException e) {
-            Timber.e(e);
-        } finally {
-
-            closeConnection(urlConnection);
-        }
-        return true;
-    }
-
-    public AccountConfiguration fetchOAuthConfiguration() {
-
-        String baseUrl = configuration.dristhiBaseURL();
-
-        if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-        }
-
-        baseUrl = baseUrl + AccountHelper.OAUTH.ACCOUNT_CONFIGURATION_ENDPOINT;
-
-        HttpURLConnection urlConnection = null;
-
-        InputStream inputStream = null;
-        try {
-
-            urlConnection = getHttpURLConnection(baseUrl);
-
-            int statusCode = urlConnection.getResponseCode();
-            if (statusCode == HttpStatus.SC_OK) {
-
-                inputStream = urlConnection.getInputStream();
-
-                String responseString = IOUtils.toString(inputStream);
-
-                return gson.fromJson(responseString, AccountConfiguration.class);
-            }
-
-        } catch (IOException e) {
-            Timber.e(e);
-        } finally {
-
-            closeConnection(urlConnection);
-            closeIOStream(inputStream);
-
-        }
-        return null;
-    }
 
     private void closeConnection(HttpURLConnection urlConnection) {
         if (urlConnection != null) {

@@ -153,7 +153,7 @@ public class ResetAppHelper {
         if (p2POptions != null && p2POptions.isEnableP2PLibrary()) {
             AppDatabase roomP2PDb = P2PLibrary.getInstance().getDb();
             roomP2PDb.clearAllTables();
-            Utils.deleteRoomDb(application.getApplicationContext(), roomP2PDb.getOpenHelper().getDatabaseName());
+//            Utils.deleteRoomDb(application.getApplicationContext(), roomP2PDb.getOpenHelper().getDatabaseName());
         }
     }
 

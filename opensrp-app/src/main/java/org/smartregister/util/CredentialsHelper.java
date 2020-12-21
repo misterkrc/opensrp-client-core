@@ -5,7 +5,6 @@ import org.smartregister.Context;
 import org.smartregister.CoreLibrary;
 import org.smartregister.SyncConfiguration;
 import org.smartregister.SyncFilter;
-import org.smartregister.account.AccountHelper;
 import org.smartregister.domain.jsonmapping.LoginResponseData;
 import org.smartregister.repository.AllSharedPreferences;
 import org.smartregister.security.PasswordHash;
@@ -32,20 +31,20 @@ public class CredentialsHelper {
                         BuildConfig.DB_ENCRYPTION_VERSION > CoreLibrary.getInstance().context().allSharedPreferences().getDBEncryptionVersion());
     }
 
-    public byte[] getCredentials(String username, String type) {
-
-        if (CREDENTIALS_TYPE.DB_AUTH.equals(type)) {
-
-            return context.userService().getDecryptedPassphraseValue(username);
-
-        } else if (CREDENTIALS_TYPE.LOCAL_AUTH.equals(type)) {
-
-            return context.userService().getDecryptedAccountValue(username, AccountHelper.INTENT_KEY.ACCOUNT_LOCAL_PASSWORD);
-
-        }
-
-        return null;
-    }
+//    public byte[] getCredentials(String username, String type) {
+//
+//        if (CREDENTIALS_TYPE.DB_AUTH.equals(type)) {
+//
+//            return context.userService().getDecryptedPassphraseValue(username);
+//
+//        } else if (CREDENTIALS_TYPE.LOCAL_AUTH.equals(type)) {
+//
+//            return context.userService().getDecryptedAccountValue(username, AccountHelper.INTENT_KEY.ACCOUNT_LOCAL_PASSWORD);
+//
+//        }
+//
+//        return null;
+//    }
 
 
     public void saveCredentials(String type, String encryptedPassphrase,String username) {

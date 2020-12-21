@@ -10,7 +10,6 @@ import androidx.annotation.Nullable;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import org.apache.commons.lang3.StringUtils;
-import org.smartregister.account.AccountAuthenticatorXml;
 import org.smartregister.authorizer.P2PSyncAuthorizationService;
 import org.smartregister.p2p.P2PLibrary;
 import org.smartregister.pathevaluator.PathEvaluatorLibrary;
@@ -33,7 +32,7 @@ import static android.preference.PreferenceManager.getDefaultSharedPreferences;
 /**
  * Created by keyman on 31/07/17.
  */
-public class CoreLibrary implements OnAccountsUpdateListener {
+public class CoreLibrary {
 
     private final Context context;
 
@@ -47,10 +46,6 @@ public class CoreLibrary implements OnAccountsUpdateListener {
     private String ecClientFieldsFile = "ec_client_fields.json";
 
     private P2POptions p2POptions;
-
-    private AccountManager accountManager;
-
-    private AccountAuthenticatorXml authenticatorXml;
 
     public static void init(Context context) {
         init(context, null);
@@ -68,17 +63,7 @@ public class CoreLibrary implements OnAccountsUpdateListener {
         if (instance == null) {
             instance = new CoreLibrary(context, syncConfiguration, options);
             buildTimeStamp = buildTimestamp;
-            checkPlatformMigrations();
         }
-    }
-
-
-    private static void checkPlatformMigrations() {
-        boolean shouldMigrate = CredentialsHelper.shouldMigrate();
-        if (shouldMigrate && StringUtils.isNotBlank(instance.context().userService().getAllSharedPreferences().fetchPioneerUser())) {//Force remote login
-            Utils.logoutUser(instance.context(), instance.context().applicationContext().getString(R.string.new_db_encryption_version_migration));
-        }
-        instance.context().userService().getAllSharedPreferences().migratePassphrase();
     }
 
     public static CoreLibrary getInstance() {
@@ -168,22 +153,6 @@ public class CoreLibrary implements OnAccountsUpdateListener {
         return syncConfiguration;
     }
 
-    public AccountManager getAccountManager() {
-        if (accountManager == null) {
-            accountManager = AccountManager.get(context.applicationContext());
-            accountManager.addOnAccountsUpdatedListener(this, null, true);
-        }
-
-        return accountManager;
-    }
-
-    public AccountAuthenticatorXml getAccountAuthenticatorXml() {
-        if (authenticatorXml == null)
-            authenticatorXml = Utils.parseAuthenticatorXMLConfigData(context.applicationContext());
-
-        return authenticatorXml;
-    }
-
     public static long getBuildTimeStamp() {
         return buildTimeStamp;
     }
@@ -220,32 +189,4 @@ public class CoreLibrary implements OnAccountsUpdateListener {
                 .sendBroadcast(intent);
     }
 
-    @Override
-    public void onAccountsUpdated(Account[] accounts) {
-        if (context.allSharedPreferences().getDBEncryptionVersion() > 0) {
-            try {
-                String loggedInUser = context.allSharedPreferences().fetchRegisteredANM();
-
-                if (!StringUtils.isBlank(loggedInUser)) {
-
-                    boolean accountExists = false;
-
-                    for (Account account : accounts) {
-                        if (account.type.equals(getAccountAuthenticatorXml().getAccountType()) && account.name.equals(context.allSharedPreferences().fetchRegisteredANM())) {
-                            accountExists = true;
-                            break;
-                        }
-                    }
-
-                    if (!accountExists) {
-
-                        Utils.logoutUser(context, context.applicationContext().getString(R.string.account_removed));
-
-                    }
-                }
-            } catch (Exception e) {
-                Timber.e(e);
-            }
-        }
-    }
 }

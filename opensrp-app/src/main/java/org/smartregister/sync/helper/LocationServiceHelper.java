@@ -105,7 +105,7 @@ public class LocationServiceHelper extends BaseHelper {
         syncProgress.setTotalRecords(totalRecords);
 
         List<Location> locationStructures = batchSyncLocationsStructures(isJurisdiction, new ArrayList<>(), true);
-        syncProgress.setPercentageSynced(Utils.calculatePercentage(totalRecords, locationStructures.size()));
+//        syncProgress.setPercentageSynced(Utils.calculatePercentage(totalRecords, locationStructures.size()));
         sendSyncProgressBroadcast(syncProgress, context);
         return locationStructures;
     }
@@ -142,14 +142,9 @@ public class LocationServiceHelper extends BaseHelper {
                 String maxServerVersion = getMaxServerVersion(locations);
                 String updateKey = isJurisdiction ? LOCATION_LAST_SYNC_DATE : STRUCTURES_LAST_SYNC_DATE;
                 allSharedPreferences.savePreference(updateKey, maxServerVersion);
-
-                // retry fetch since there were items synced from the server
-                locations.addAll(batchLocationStructures);
-                syncProgress.setPercentageSynced(Utils.calculatePercentage(totalRecords, locations.size()));
-                sendSyncProgressBroadcast(syncProgress, context);
-                return batchSyncLocationsStructures(isJurisdiction, locations, false);
-
             }
+            return locations;
+
         } catch (Exception e) {
             Timber.e(e, "EXCEPTION %s", e.toString());
         }

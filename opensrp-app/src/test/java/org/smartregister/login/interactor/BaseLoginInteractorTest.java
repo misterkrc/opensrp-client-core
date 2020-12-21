@@ -27,11 +27,6 @@ import org.smartregister.Context;
 import org.smartregister.CoreLibrary;
 import org.smartregister.R;
 import org.smartregister.SyncConfiguration;
-import org.smartregister.account.AccountAuthenticatorXml;
-import org.smartregister.account.AccountConfiguration;
-import org.smartregister.account.AccountError;
-import org.smartregister.account.AccountHelper;
-import org.smartregister.account.AccountResponse;
 import org.smartregister.domain.LoginResponse;
 import org.smartregister.domain.Setting;
 import org.smartregister.domain.TimeStatus;
@@ -124,9 +119,6 @@ public class BaseLoginInteractorTest extends BaseRobolectricUnitTest {
     private LoginResponseData loginResponseData;
 
     @Mock
-    private AccountConfiguration accountConfiguration;
-
-    @Mock
     private SharedPreferences sharedPreferences;
 
     @Mock
@@ -137,12 +129,6 @@ public class BaseLoginInteractorTest extends BaseRobolectricUnitTest {
 
     @Mock
     private SharedPreferences.Editor sharePrefEditor;
-
-    @Mock
-    private AccountAuthenticatorXml accountAuthenticatorXml;
-
-    @Mock
-    private AccountResponse accountResponse;
 
     private String username = "johndoe";
     private char[] qwertyPassword = "qwerty".toCharArray();
@@ -156,7 +142,6 @@ public class BaseLoginInteractorTest extends BaseRobolectricUnitTest {
         when(context.allSharedPreferences()).thenReturn(allSharedPreferences);
         when(context.userService()).thenReturn(userService);
         when(presenter.getLoginView()).thenReturn(view);
-        when(presenter.getPassword()).thenReturn(qwertyPassword);
 
         activity = Robolectric.buildActivity(AppCompatActivity.class).create().get();
 
@@ -168,21 +153,9 @@ public class BaseLoginInteractorTest extends BaseRobolectricUnitTest {
 
         when(context.getHttpAgent()).thenReturn(httpAgent);
         when(context.allSettings()).thenReturn(allSettings);
-        when(accountConfiguration.getAuthorizationEndpoint()).thenReturn("https://my-server.com/oauth/auth");
-        when(accountConfiguration.getTokenEndpoint()).thenReturn("https://my-server.com/");
-        when(accountConfiguration.getIssuerEndpoint()).thenReturn("https://my-server.com/oauth/issuer");
-        when(accountConfiguration.getGrantTypesSupported()).thenReturn(new LinkedList<>(Arrays.asList(new String[]{AccountHelper.OAUTH.GRANT_TYPE.PASSWORD})));
-
-        when(httpAgent.fetchOAuthConfiguration()).thenReturn(accountConfiguration);
-        when(accountResponse.getAccessToken()).thenReturn("a-random-access-token");
-
-        when(httpAgent.oauth2authenticate(ArgumentMatchers.anyString(), ArgumentMatchers.any(char[].class), ArgumentMatchers.eq(AccountHelper.OAUTH.GRANT_TYPE.PASSWORD), ArgumentMatchers.eq("https://my-server.com/"))).thenReturn(accountResponse);
-
-        when(accountAuthenticatorXml.getAccountType()).thenReturn("org.smartregister.core.testapp");
 
         Whitebox.setInternalState(CoreLibrary.getInstance(), "context", context);
         Whitebox.setInternalState(CoreLibrary.getInstance(), "accountManager", mAccountManager);
-        Whitebox.setInternalState(CoreLibrary.getInstance(), "authenticatorXml", accountAuthenticatorXml);
 
 
     }

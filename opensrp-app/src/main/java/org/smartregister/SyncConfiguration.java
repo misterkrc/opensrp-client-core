@@ -1,8 +1,5 @@
 package org.smartregister;
 
-import org.smartregister.account.AccountHelper;
-import org.smartregister.view.activity.BaseLoginActivity;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -169,19 +166,5 @@ public abstract class SyncConfiguration {
     public boolean runPlanEvaluationOnClientProcessing() {
         return false;
     }
-
-    public abstract String getOauthClientId();
-
-    public abstract String getOauthClientSecret();
-
-    /**
-     * Returns number of times to retry if 401 is received on a request before forcing user to enter credentials
-     * Default is once, can be overriden
-     */
-    public int getMaxAuthenticationRetries() {
-        return AccountHelper.MAX_AUTH_RETRIES;
-    }
-
-    public abstract Class<? extends BaseLoginActivity> getAuthenticationActivity();
 
 }

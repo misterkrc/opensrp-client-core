@@ -34,7 +34,6 @@ import java.util.Set;
 
 import timber.log.Timber;
 
-import static org.smartregister.account.AccountHelper.CONFIGURATION_CONSTANTS.IS_KEYCLOAK_CONFIGURED;
 import static org.smartregister.sync.helper.LocationServiceHelper.LOCATION_LAST_SYNC_DATE;
 import static org.smartregister.sync.helper.LocationServiceHelper.STRUCTURES_LAST_SYNC_DATE;
 import static org.smartregister.sync.helper.PlanIntentServiceHelper.PLAN_LAST_SYNC_DATE;
@@ -81,10 +80,6 @@ public class ValidateAssignmentHelper extends BaseHelper {
     }
 
     public void validateUserAssignment() {
-        boolean keycloakConfigured = allSharedPreferences.getBooleanPreference(IS_KEYCLOAK_CONFIGURED);
-        if (!keycloakConfigured) {
-            return;
-        }
         try {
             String assignment = getUserAssignment();
             if (StringUtils.isNotBlank(assignment)) {
@@ -97,7 +92,7 @@ public class ValidateAssignmentHelper extends BaseHelper {
                 if (newAssignments) {
                     logoff(R.string.account_new_assignment_logged_off);
                     resetSync();
-                } else if (removedAssignments.isRemoved()) {
+                } else  {
                     Intent intent = new Intent();
                     intent.setAction(ACTION_ASSIGNMENT_REMOVED);
                     intent.putExtra(ASSIGNMENTS_REMOVED, removedAssignments);
@@ -121,7 +116,7 @@ public class ValidateAssignmentHelper extends BaseHelper {
         //skip logoff if user is already logged off
         if (!userService.hasSessionExpired()) {
             Timber.i("Logging out user");
-            syncUtils.logoutUser(message);
+            syncUtils.logoutUser();
         } else {
             Timber.i("User already logged out");
         }
@@ -131,32 +126,32 @@ public class ValidateAssignmentHelper extends BaseHelper {
     private UserAssignmentDTO processRemovedAssignments(UserAssignmentDTO currentUserAssignment, Set<Long> existingOrganizations, Set<String> existingJurisdictions, Set<String> existingPlans) throws AuthenticatorException, OperationCanceledException, IOException {
         Set<Long> ids = new HashSet<>(existingOrganizations);
         Set<String> prefsIds = new HashSet<>(existingJurisdictions);
-        existingJurisdictions.removeAll(currentUserAssignment.getJurisdictions());
-        existingOrganizations.removeAll(currentUserAssignment.getOrganizationIds());
-        existingPlans.removeAll(currentUserAssignment.getPlans());
+//        existingJurisdictions.removeAll(currentUserAssignment.getJurisdictions());
+//        existingOrganizations.removeAll(currentUserAssignment.getOrganizationIds());
+//        existingPlans.removeAll(currentUserAssignment.getPlans());
 
         LocationTree locationTree = gson.fromJson(settingsRepository.fetchANMLocation(), LocationTree.class);
         boolean removed = false;
-        UserAssignmentDTO removedAssignments = UserAssignmentDTO.builder().jurisdictions(existingJurisdictions).organizationIds(existingOrganizations).plans(existingPlans).build();
+//        UserAssignmentDTO removedAssignments = UserAssignmentDTO.builder().jurisdictions(existingJurisdictions).organizationIds(existingOrganizations).plans(existingPlans).build();
 
-        if (!Utils.isEmptyCollection(removedAssignments.getPlans())) {
-            planDefinitionRepository.deletePlans(removedAssignments.getPlans());
-            removed = true;
-        }
+//        if (!Utils.isEmptyCollection(removedAssignments.getPlans())) {
+//            planDefinitionRepository.deletePlans(removedAssignments.getPlans());
+//            removed = true;
+//        }
 
-        if (!Utils.isEmptyCollection(removedAssignments.getOrganizationIds())) {
-            ids.removeAll(removedAssignments.getOrganizationIds());
-            userService.saveOrganizations(new ArrayList<>(ids));
-            removed = true;
-        }
-        if (!Utils.isEmptyCollection(removedAssignments.getJurisdictions())) {
-            locationRepository.deleteLocations(removedAssignments.getJurisdictions());
-            removeLocationsFromHierarchy(locationTree, removedAssignments.getJurisdictions());
-            prefsIds.removeAll(removedAssignments.getJurisdictions());
-            userService.saveJurisdictionIds(prefsIds);
-            removed = true;
-        }
-        return removedAssignments.toBuilder().isRemoved(removed).build();
+//        if (!Utils.isEmptyCollection(removedAssignments.getOrganizationIds())) {
+//            ids.removeAll(removedAssignments.getOrganizationIds());
+//            userService.saveOrganizations(new ArrayList<>(ids));
+//            removed = true;
+//        }
+//        if (!Utils.isEmptyCollection(removedAssignments.getJurisdictions())) {
+//            locationRepository.deleteLocations(removedAssignments.getJurisdictions());
+//            removeLocationsFromHierarchy(locationTree, removedAssignments.getJurisdictions());
+//            prefsIds.removeAll(removedAssignments.getJurisdictions());
+//            userService.saveJurisdictionIds(prefsIds);
+//            removed = true;
+//        }
+        return null;
 
     }
 
@@ -177,13 +172,14 @@ public class ValidateAssignmentHelper extends BaseHelper {
     private boolean hasNewAssignments(UserAssignmentDTO currentUserAssignment, Set<Long> existingOrganizations, Set<String> existingJurisdictions) {
         if (existingJurisdictions.isEmpty()) {
             LocationTree locationTree = gson.fromJson(settingsRepository.fetchANMLocation(), LocationTree.class);
-            for (String location : currentUserAssignment.getJurisdictions()) {
-                if (!locationTree.hasLocation(location)) return true;
-            }
+//            for (String location : currentUserAssignment.getJurisdictions()) {
+//                if (!locationTree.hasLocation(location)) return true;
+//            }
             return false;
         }
 
-        return !existingOrganizations.containsAll(currentUserAssignment.getOrganizationIds()) || !existingJurisdictions.containsAll(currentUserAssignment.getJurisdictions());
+//        return !existingOrganizations.containsAll(currentUserAssignment.getOrganizationIds()) || !existingJurisdictions.containsAll(currentUserAssignment.getJurisdictions());
+        return false;
     }
 
     private String getUserAssignment() throws NoHttpResponseException {

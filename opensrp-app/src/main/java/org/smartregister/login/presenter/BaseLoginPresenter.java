@@ -43,7 +43,7 @@ public abstract class BaseLoginPresenter implements BaseLoginContract.Presenter 
     }
 
     @Override
-    public void attemptLogin(String username, char[] password) {
+    public void attemptLogin(String username, String password) {
         if (!mLoginView.get().isAppVersionAllowed()) {
             getLoginView().showErrorDialog(getLoginView()
                     .getActivityContext().getResources().getString(R.string.outdated_app));
@@ -70,7 +70,7 @@ public abstract class BaseLoginPresenter implements BaseLoginContract.Presenter 
         }
 
         if (!cancel) {
-            mLoginInteractor.login(mLoginView, username.trim(), password);
+            mLoginInteractor.login(mLoginView, username.trim(), password.trim());
 
         }
     }
@@ -136,11 +136,6 @@ public abstract class BaseLoginPresenter implements BaseLoginContract.Presenter 
         Configuration configuration = resources.getConfiguration();
         configuration.locale = new Locale(preferredLocale);
         resources.updateConfiguration(configuration, displayMetrics);
-    }
-
-    @Override
-    public char[] getPassword() {
-        return SecurityHelper.readValue(getLoginView().getPasswordEditText().getText());
     }
 
     @Override

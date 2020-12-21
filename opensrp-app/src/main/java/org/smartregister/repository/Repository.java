@@ -160,7 +160,7 @@ public class Repository extends SQLiteOpenHelper {
     }
 
     @VisibleForTesting
-    protected boolean isDatabaseWritable(byte[] password) {
+    protected boolean isDatabaseWritable(String password) {
         SQLiteDatabase database = SQLiteDatabase
                 .openDatabase(databasePath.getPath(), password, null,
                         SQLiteDatabase.OPEN_READONLY, hook, new OpenSRPDatabaseErrorHandler());
@@ -168,7 +168,7 @@ public class Repository extends SQLiteOpenHelper {
         return true;
     }
 
-    public boolean canUseThisPassword(byte[] password) {
+    public boolean canUseThisPassword(String password) {
         try {
             return isDatabaseWritable(password);
         } catch (SQLiteException e) {
@@ -194,7 +194,7 @@ public class Repository extends SQLiteOpenHelper {
         }
     }
 
-    private byte[] password() {
+    private String password() {
         return DrishtiApplication.getInstance().getPassword();
     }
 

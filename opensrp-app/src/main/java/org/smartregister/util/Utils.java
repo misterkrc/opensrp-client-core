@@ -63,7 +63,6 @@ import org.smartregister.AllConstants;
 import org.smartregister.CoreLibrary;
 import org.smartregister.R;
 import org.smartregister.SyncFilter;
-import org.smartregister.account.AccountAuthenticatorXml;
 import org.smartregister.commonregistry.CommonPersonObject;
 import org.smartregister.commonregistry.CommonPersonObjectClient;
 import org.smartregister.domain.FetchStatus;
@@ -917,51 +916,5 @@ public class Utils {
         return stringBuilder.toString();
     }
 
-    public static AccountAuthenticatorXml parseAuthenticatorXMLConfigData(Context context) {
-        try {
-            int eventType = -1;
-            String namespace = "http://schemas.android.com/apk/res/android";
-            AccountAuthenticatorXml authenticatorXml = new AccountAuthenticatorXml();
-            XmlResourceParser parser = context.getResources().getXml(R.xml.authenticator);
 
-            while (eventType != XmlResourceParser.END_DOCUMENT) {
-                if (eventType == XmlResourceParser.START_TAG) {
-                    String element = parser.getName();
-
-                    if ("account-authenticator".equals(element)) {
-                        //Account type id
-                        String accountType = parser.getAttributeValue(namespace, "accountType");
-                        authenticatorXml.setAccountType(accountType);
-
-                        //Account Name
-                        int labelId = parser.getAttributeResourceValue(namespace, "label", 0);
-                        authenticatorXml.setAccountLabel(context.getResources().getString(labelId));
-
-                        //Icon
-                        int iconImageResourceId = parser.getAttributeResourceValue(namespace, "icon", 0);
-                        authenticatorXml.setIcon(iconImageResourceId);
-                    }
-                }
-                eventType = parser.next();
-            }
-            return authenticatorXml;
-        } catch (Exception e) {
-            Timber.e(e);
-            return null;
-        }
-    }
-
-    public static void logoutUser(org.smartregister.Context context, String message) {
-        Intent intent = new Intent(context.applicationContext(), CoreLibrary.getInstance().getSyncConfiguration().getAuthenticationActivity());
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.addCategory(Intent.CATEGORY_HOME);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        if (StringUtils.isNotBlank(message))
-            intent.putExtra(AllConstants.INTENT_KEY.DIALOG_MESSAGE, message);
-
-        context.applicationContext().startActivity(intent);
-        context.userService().forceRemoteLogin(context.allSharedPreferences().fetchRegisteredANM());
-        context.userService().logoutSession();
-    }
 }

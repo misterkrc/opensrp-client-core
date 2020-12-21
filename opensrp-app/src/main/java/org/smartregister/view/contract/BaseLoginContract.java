@@ -11,7 +11,7 @@ import java.lang.ref.WeakReference;
 public interface BaseLoginContract {
     interface Presenter {
 
-        void attemptLogin(String username, char[] password);
+        void attemptLogin(String username, String password);
 
         View getLoginView();
 
@@ -28,8 +28,6 @@ public interface BaseLoginContract {
         org.smartregister.Context getOpenSRPContext();
 
         boolean isServerSettingsSet();
-
-        char[] getPassword();
     }
 
     interface View {
@@ -74,14 +72,14 @@ public interface BaseLoginContract {
 
         void onDestroy(boolean isChangingConfiguration);
 
-        void login(WeakReference<View> view, String userName, char[] password);
+        void login(WeakReference<View> view, String userName, String password);
     }
 
     interface Model {
 
         boolean isEmptyUsername(String username);
 
-        boolean isPasswordValid(char[] password);
+        boolean isPasswordValid(String password);
 
         org.smartregister.Context getOpenSRPContext();
 

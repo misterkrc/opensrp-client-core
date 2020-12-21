@@ -209,7 +209,6 @@ public class SyncIntentService extends BaseSyncIntentService {
                 processClient(serverVersionPair);
                 ecSyncUpdater.updateLastSyncTimeStamp(lastServerVersion);
             }
-            sendSyncProgressBroadcast(eCount);
             fetchRetry(0, false);
         }
     }
@@ -368,18 +367,6 @@ public class SyncIntentService extends BaseSyncIntentService {
             Timber.e(e);
         }
         return count;
-    }
-
-    protected void sendSyncProgressBroadcast(int eventCount) {
-        fetchedRecords = fetchedRecords + eventCount;
-        SyncProgress syncProgress = new SyncProgress();
-        syncProgress.setSyncEntity(SyncEntity.EVENTS);
-        syncProgress.setTotalRecords(totalRecords);
-        syncProgress.setPercentageSynced(Utils.calculatePercentage(totalRecords, fetchedRecords));
-        Intent intent = new Intent();
-        intent.setAction(AllConstants.SyncProgressConstants.ACTION_SYNC_PROGRESS);
-        intent.putExtra(AllConstants.SyncProgressConstants.SYNC_PROGRESS_DATA, syncProgress);
-        LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
     }
 
     public int getEventPullLimit() {

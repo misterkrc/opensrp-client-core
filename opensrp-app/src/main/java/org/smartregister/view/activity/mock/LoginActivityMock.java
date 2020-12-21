@@ -51,4 +51,14 @@ public class LoginActivityMock extends BaseLoginActivity {
     public void goToHome(boolean isRemote) {
         //Override
     }
+
+    @Override
+    public String getAuthTokenType() {
+        return null;
+    }
+
+    @Override
+    public boolean isNewAccount() {
+        return false;
+    }
 }

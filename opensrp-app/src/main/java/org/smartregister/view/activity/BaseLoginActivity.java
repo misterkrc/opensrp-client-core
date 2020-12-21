@@ -28,7 +28,6 @@ import android.widget.TextView;
 import org.joda.time.DateTime;
 import org.smartregister.AllConstants;
 import org.smartregister.R;
-import org.smartregister.account.AccountHelper;
 import org.smartregister.security.SecurityHelper;
 import org.smartregister.util.SyncUtils;
 import org.smartregister.util.Utils;
@@ -65,9 +64,6 @@ public abstract class BaseLoginActivity extends MultiLanguageActivity implements
         mLoginPresenter.setLanguage();
         setupViews(mLoginPresenter);
         syncUtils = new SyncUtils(this);
-
-        authTokenType = getIntent().getStringExtra(AccountHelper.INTENT_KEY.AUTH_TYPE);
-
     }
 
     @Override
@@ -232,7 +228,7 @@ public abstract class BaseLoginActivity extends MultiLanguageActivity implements
 
     protected void attemptLogin() {
         String username = userNameEditText.getText().toString().trim();
-        char[] password = SecurityHelper.readValue(passwordEditText.getText());
+        String password = passwordEditText.getText().toString();
         mLoginPresenter.attemptLogin(username, password);
     }
 
@@ -305,17 +301,5 @@ public abstract class BaseLoginActivity extends MultiLanguageActivity implements
                 .setNegativeButton(android.R.string.cancel, onClickListener)
                 .setCancelable(false)
                 .show();
-    }
-
-    public String getAuthTokenType() {
-
-        if (authTokenType == null)
-            authTokenType = AccountHelper.TOKEN_TYPE.PROVIDER;
-
-        return authTokenType;
-    }
-
-    public boolean isNewAccount() {
-        return getIntent().getBooleanExtra(AccountHelper.INTENT_KEY.IS_NEW_ACCOUNT, false);
     }
 }
