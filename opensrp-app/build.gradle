@@ -28,6 +28,8 @@ apply plugin: 'com.android.library'
 apply plugin: 'jacoco'
 apply plugin: 'com.github.kt3k.coveralls'
 apply plugin: 'maven-publish'
+
+apply plugin: 'com.github.dcendents.android-maven'
 jacoco {
     toolVersion = "0.8.5"
 }
