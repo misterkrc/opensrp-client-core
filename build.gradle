@@ -35,7 +35,7 @@ project.ext.preDexLibs = !project.hasProperty('disablePreDex')
 
 subprojects {
 
-    group = 'org.smartregister'
+    group = 'com.github.misterkrc'
 
     ext.androidToolsBuildGradle     = '4.0.0'
     ext.androidBuildToolsVersion    = '29.0.3'
